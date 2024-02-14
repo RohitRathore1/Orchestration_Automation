@@ -1,0 +1,29 @@
+---
+- name: Setup Worker Nodes
+  hosts: workernode
+  tasks:
+    - name: Find Head Node IP
+      set_fact:
+        headnode_ip: "{{ hostvars[groups['headnode'][0]]['ansible_host'] }}"
+      run_once: true
+
+    - name: Debug headnode IP
+      debug:
+        msg: "Head node IP is {{ headnode_ip }}"
+
+    - name: Fetch join command from the Head Node
+      synchronize:
+        src: "/tmp/join_command.sh"
+        dest: "/tmp/join_command.sh"
+        mode: pull
+        recursive: yes
+        times: yes
+        delete: no
+
+    - name: Join Ray Cluster
+      shell: |
+        source ~/ray_env/bin/activate
+        ray stop
+        nohup bash /tmp/join_command.sh > /tmp/ray_worker_join.log 2>&1 &
+      args:
+        executable: /bin/bash

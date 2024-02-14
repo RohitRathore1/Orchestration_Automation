@@ -1,0 +1,187 @@
+---
+- name: Install dependencies to create a Ray cluster
+  hosts: all
+  remote_user: ubuntu
+  become: true
+  vars:
+    arch_mapping:
+      x86_64: amd64
+      aarch64: arm64
+    user_name: ubuntu
+
+  tasks:
+  - name: Update and upgrade all packages to the latest version
+    ansible.builtin.apt:
+      update_cache: true
+      upgrade: dist
+      cache_valid_time: 3600
+
+  - name: Install necessary packages
+    apt:
+      name: "{{ packages }}"
+      state: latest
+      update_cache: true
+    vars:
+      packages:
+      - python3-pip
+      - python3-venv
+
+  - name: Install required packages
+    ansible.builtin.apt:
+      pkg:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - gnupg
+        - software-properties-common
+
+  - name: Create directory for Docker's GPG key
+    ansible.builtin.file:
+      path: /etc/apt/keyrings
+      state: directory
+      mode: '0755'
+
+  - name: Add Docker's official GPG key
+    ansible.builtin.apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      keyring: /etc/apt/keyrings/docker.gpg
+      state: present
+
+  - name: Print architecture variables
+    ansible.builtin.debug:
+      msg: "Architecture: {{ ansible_architecture }}, Codename: {{ ansible_lsb.codename }}"
+
+  - name: Add Docker repository
+    ansible.builtin.apt_repository:
+      repo: >-
+        deb [arch={{ arch_mapping[ansible_architecture] | default(ansible_architecture) }}
+        signed-by=/etc/apt/keyrings/docker.gpg]
+        https://download.docker.com/linux/ubuntu {{ ansible_lsb.codename }} stable
+      filename: docker
+      state: present
+
+  - name: Install docker and related packages
+    ansible.builtin.apt:
+      name: "{{ item }}"
+      state: present
+      update_cache: true
+    loop: 
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+
+  - name: Add Docker group
+    ansible.builtin.group:
+      name: docker
+      state: present
+
+  - name: Add user to Docker group
+    ansible.builtin.user:
+      name: "{{ user_name }}"
+      groups: docker
+      append: true
+
+  - name: Enable and start Docker services
+    ansible.builtin.systemd:
+      name: "{{ item }}"
+      enabled: true
+      state: started
+    loop:
+      - docker.service
+      - containerd.service
+
+  - name: Create a virtual environment for Ray
+    shell: |
+      python3 -m venv ~/ray_env
+    args:
+      creates: "~/ray_env"
+
+  - name: Activate the Ray environment
+    shell: |
+      source ~/ray_env/bin/activate
+    args:
+      executable: /bin/bash
+
+  - name: Install Ray with default dependencies
+    ansible.builtin.pip:
+      name: "ray[default]"
+      state: latest
+
+  - name: Check Ray version
+    ansible.builtin.command:
+      cmd: python3 -c "import ray; print(ray.__version__)"
+    register: ray_version_output
+
+  - name: Print Ray version
+    ansible.builtin.debug:
+      msg: "Ray version on {{ inventory_hostname }}: {{ ray_version_output.stdout }}"
+
+- name: Setup Ray Head Node
+  hosts: headnode
+  become: true
+  tasks:
+    - name: Start Ray Head Node
+      shell: |
+        source ~/ray_env/bin/activate
+        ray stop
+        nohup ray start --head --port=6379 --num-gpus=1 > ray_head.log 2>&1 &
+      args:
+        executable: /bin/bash
+
+    - name: Generate worker join command
+      shell: echo "ray start --address='{{ ansible_host }}:6379' --num-gpus=1 --block" > /tmp/join_command.sh
+      args:
+        executable: /bin/bash
+
+- name: Setup Worker Nodes
+  hosts: workernode
+  tasks:
+    - name: Find Head Node IP
+      set_fact:
+        headnode_ip: "{{ hostvars[groups['headnode'][0]]['ansible_host'] }}"
+      run_once: true
+
+    - name: Debug headnode IP
+      debug:
+        msg: "Head node IP is {{ headnode_ip }}"
+
+    - name: Fetch join command from the Head Node
+      synchronize:
+        src: "/tmp/join_command.sh"
+        dest: "/tmp/join_command.sh"
+        mode: pull
+        recursive: yes
+        times: yes
+        delete: no
+
+    - name: Join Ray Cluster
+      shell: |
+        source ~/ray_env/bin/activate
+        ray stop
+        nohup bash /tmp/join_command.sh > /tmp/ray_worker_join.log 2>&1 &
+      args:
+        executable: /bin/bash
+
+- name: Check Ray Cluster Status and Dashboard URL
+  hosts: headnode
+  become: true
+  tasks:
+    - name: Check Ray Cluster Status
+      command: ray status
+      register: ray_status
+      ignore_errors: yes
+
+    - name: Print Ray Cluster Status
+      debug:
+        msg: "{{ ray_status.stdout_lines }}"
+
+    - name: Get Ray Dashboard URL
+      shell: echo http://$(hostname -I | awk '{print $1}'):8265
+      register: ray_dashboard_url
+
+    - name: Print Ray Dashboard URL
+      debug:
+        msg: "Access Ray Dashboard at: {{ ray_dashboard_url.stdout }}"
+    

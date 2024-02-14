@@ -1,0 +1,16 @@
+---
+- hosts: headnode
+  become: true
+  tasks:
+    - name: Start Ray Head Node
+      shell: |
+        source ~/ray_env/bin/activate
+        ray stop
+        nohup ray start --head --port=6379 --num-gpus=1 > ray_head.log 2>&1 &
+      args:
+        executable: /bin/bash
+
+    - name: Generate worker join command
+      shell: echo "ray start --address='{{ ansible_host }}:6379' --num-gpus=1 --block" > /tmp/join_command.sh
+      args:
+        executable: /bin/bash
