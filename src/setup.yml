@@ -118,6 +118,18 @@
     ansible.builtin.debug:
       msg: "Ray version on {{ inventory_hostname }}: {{ ray_version_output.stdout }}"
 
+- name: Setup GPU Drivers, and CUDA
+  hosts: all
+  become: true
+  vars:
+    ubuntu_versions:
+      "20.04":
+        cuda_repo_deb: "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.1-1_all.deb"
+      "22.04":
+        cuda_repo_deb: "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb"
+      "18.04":
+        cuda_repo_deb: "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-keyring_1.1-1_all.deb"
+
 - name: Setup Ray Head Node
   hosts: headnode
   become: true
