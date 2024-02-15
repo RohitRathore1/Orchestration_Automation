@@ -104,6 +104,8 @@ Before installing packages, we need to activate the virtual environment
 
 # Project Structure
 
+
+```
 ├── app/
 │   ├── __init__.py
 │   ├── main.py              # Entry point of the application
@@ -130,6 +132,7 @@ Before installing packages, we need to activate the virtual environment
 ├── .env                     # Environment variables file
 ├── requirements.txt         # Python dependencies
 └── README.md
+```
 
 # Key-Value Store API Documentation
 
