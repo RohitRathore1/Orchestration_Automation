@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from main import app  # replace with the name of your FastAPI file
+from app.main import app  # replace with the name of your FastAPI file
 
 @pytest.fixture
 def client():

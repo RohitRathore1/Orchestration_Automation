@@ -1,5 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException
 import uvicorn
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import HTTPBasicCredentials
 from fastapi import Depends
 from app.dependencies import get_current_user
@@ -14,10 +14,12 @@ logger = logging.getLogger(__name__)
 # Global data_store dictionary to simulate database storage
 data_store = {}
 
-app = FastAPI()
+app = FastAPI(
+    title="Key-Value Store",
+    version="0.1",
+)
 
-@app.on_event("startup")
-async def startup_event():
+async def startup():
     logger.info("Loading data into data_store...")
     try:
         current_file_dir = os.path.dirname(__file__)  
@@ -31,6 +33,12 @@ async def startup_event():
             logger.info(f"Loaded {len(lines)} items into data_store.")
     except Exception as e:
         logger.error(f"Failed to load data: {e}")
+        
+async def shutdown():
+    logger.info("Shutting down...")
+    
+app.add_event_handler("startup", startup)
+app.add_event_handler("shutdown", shutdown)
 
 app.include_router(item_router)
 

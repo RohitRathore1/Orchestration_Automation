@@ -1,5 +1,7 @@
 api/__pycache__/
-api/data/
+api/.pytest_cache/
 api/app/__pycache__/
-api/app/api/
+api/app/routes/__pycache__/
+api/app/tests/__pycache__/
+api/.coverage
 

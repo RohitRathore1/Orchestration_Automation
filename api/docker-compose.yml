@@ -1,0 +1,7 @@
+services:
+  api:
+    image: glob4lh3ll/api:0.1.0
+    container_name: api
+    restart: always
+    ports:
+      - 8000:8000
