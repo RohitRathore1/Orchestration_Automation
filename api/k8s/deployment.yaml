@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: my-keyvaluestore-api
+  name: my-keyvaluestore-api
+spec:
+  replicas: 3 # Scale up to 3 instances of the container
+  selector:
+    matchLabels:
+      app: my-keyvaluestore-api
+  template:
+    metadata:
+      labels:
+        app: my-keyvaluestore-api
+    spec:
+      containers:
+        - name: my-keyvaluestore-api
+          image: glob4lh3ll/api:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+          resources:
+            limits:
+              cpu: "2"
+              memory: 2Gi
+            requests:
+              cpu: "1"
+              memory: 1Gi
